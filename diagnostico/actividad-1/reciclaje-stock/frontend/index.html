@@ -1,0 +1,148 @@
+<!--Estructura con sidebar de navegación y 4 paneles: Ver Stock, Ingreso, Egreso, Agregar-->
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock — Planta de Reciclaje</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" /> <!--carga previa de Google Fonts-->
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet" /> 
+<body>
+
+  <div class="layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-icon">♻</span>
+        <div>
+          <div class="brand-title">Planta de Reciclaje</div>
+          <div class="brand-sub">Gestión de materiales</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-btn active" data-panel="stock">
+          <span class="nav-icon">▤</span> Ver Stock
+        </button>
+        <button class="nav-btn" data-panel="ingreso">
+          <span class="nav-icon">↓</span> Registrar Ingreso
+        </button>
+        <button class="nav-btn" data-panel="egreso">
+          <span class="nav-icon">↑</span> Registrar Egreso 
+        </button>
+        <button class="nav-btn" data-panel="agregar">
+          <span class="nav-icon">+</span> Agregar Material
+        </button>
+      </nav>
+    </aside>
+
+    <main class="main">
+
+      <!-- PANEL: VER STOCK -->
+      <section class="panel active" id="panel-stock">
+        <div class="panel-header">
+          <h1>Stock actual</h1>
+          <button class="btn-refresh" id="btn-refresh" title="Actualizar">↺</button>
+        </div>
+        <div id="tabla-container">
+          <div class="loading">Cargando materiales…</div>
+        </div>
+      </section>
+
+      <!-- PANEL: REGISTRAR INGRESO -->
+      <section class="panel" id="panel-ingreso">
+        <div class="panel-header">
+          <h1>Registrar Ingreso</h1>
+          <p class="panel-desc">Registrar compra sumando al stock</p>
+        </div>
+        <div class="form-card">
+          <div class="form-group">
+            <label for="sel-ingreso">Material</label>
+            <select id="sel-ingreso"><option value="">— Seleccioná material —</option></select>
+          </div>
+          <div class="form-group">
+            <label for="cant-ingreso">Cantidad <span class="unidad-hint" id="hint-ingreso"></span></label>
+            <input type="number" id="cant-ingreso" min="0.001" step="any" placeholder="0" />
+          </div>
+          <button class="btn-primary" id="btn-ingreso">Confirmar</button>
+          <div class="form-msg" id="msg-ingreso"></div>
+        </div>
+      </section>
+
+      <!-- PANEL: REGISTRAR EGRESO -->
+      <section class="panel" id="panel-egreso">
+        <div class="panel-header">
+          <h1>Registrar Egreso</h1>
+          <p class="panel-desc">Registrar venta restando del stock</p>
+        </div>
+        <div class="form-card">
+          <div class="form-group">
+            <label for="sel-egreso">Material</label>
+            <select id="sel-egreso"><option value="">— Seleccioná material —</option></select>
+          </div>
+          <div class="form-group">
+            <label for="cant-egreso">Cantidad <span class="unidad-hint" id="hint-egreso"></span></label>
+            <input type="number" id="cant-egreso" min="0.001" step="any" placeholder="0" />
+          </div>
+          <button class="btn-primary btn-egreso" id="btn-egreso">Confirmar</button>
+          <div class="form-msg" id="msg-egreso"></div>
+        </div>
+      </section>
+
+      <!-- PANEL: AGREGAR MATERIAL -->
+      <section class="panel" id="panel-agregar">
+        <div class="panel-header">
+          <h1>Agregar Material</h1>
+          <p class="panel-desc">Incorporar nuevo material al sistema</p>
+        </div>
+        <div class="form-card">
+          <div class="form-group">
+            <label for="nuevo-nombre">Nombre del material</label>
+            <input type="text" id="nuevo-nombre" placeholder="Ej: Plomo" maxlength="80" />
+          </div>
+          <div class="form-group">
+            <label>Unidad de medida</label>
+            <div class="radio-group">
+              <label class="radio-opt">
+                <input type="radio" name="nueva-unidad" value="kg" checked />
+                <span>kg — Kilogramos</span>
+              </label>
+              <label class="radio-opt">
+                <input type="radio" name="nueva-unidad" value="m3" />
+                <span>m³ — Metros cúbicos</span>
+              </label>
+              <label class="radio-opt">
+                <input type="radio" name="nueva-unidad" value="unidad" />
+                <span>unidad — Por unidad (entero)</span>
+              </label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="nueva-cantidad">Cantidad inicial (opcional)</label>
+            <input type="number" id="nueva-cantidad" min="0" step="any" placeholder="0" />
+          </div>
+          <button class="btn-primary" id="btn-agregar">Agregar</button>
+          <div class="form-msg" id="msg-agregar"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- CONFIRMACIÓN DE EGRESO-->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal">
+      <p class="modal-msg" id="modal-msg">¿Estás seguro?</p>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="modal-cancel">Cancelar</button>
+        <button class="btn-confirm" id="modal-confirm">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
