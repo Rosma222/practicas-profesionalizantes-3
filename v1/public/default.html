@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Registro</title>
+</head>
+<body>
+  <h2>Registro de usuarios</h2>
+  <!-- usa metodo POST p/enviar datos por por el cuerpo de la solicitud (body), no por URL  -->
+  <form action="/register" method="POST">
+    <label>Usuario: <input type="text" name="username" required></label><br><br>
+    <label>Password: <input type="password" name="password" required></label><br><br>
+    <button type="submit">Crear usuario</button>
+  </form>
+
+  <h2>Login de usuarios</h2>
+  <form action="/login" method="POST">
+    <label>Usuario: <input type="text" name="username" required></label><br><br>
+    <label>Password: <input type="password" name="password" required></label><br><br>
+    <button type="submit">Iniciar sesión</button>
+  </form>
+</body>
+</html>
