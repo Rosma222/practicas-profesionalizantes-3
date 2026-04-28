@@ -15,13 +15,13 @@ Usa un parser nativo (URLSearchParams + eventos data/end) para leer el cuerpo de
 Usa consultas parametrizadas ? (previene inyección SQL). Maneja errores de UNIQUE constraint y devuelve promesas.
 
 * Modularización :
-Separado en: db.mjs (datos), usecases.mjs (negocio), handlers.mjs (adaptador web), server.mjs (infra/rutas). Ninguna capa conoce a la otra.
+Separado en: db.mjs (datos), usecases.mjs (negocio), handlers.mjs (manejador web), server.mjs (infra/rutas). Ninguna capa conoce a la otra.
 
 * Sin frameworks / HTML único :
 HTML en un solo archivo con method="POST" añadido.
 
 * Sin node_modules :
-.gitignore incluido explícitamente.
+.gitignore incluido
 
 
 # ESTRUCTURA
@@ -35,7 +35,7 @@ proyecto/
 └── src/
     ├── db.mjs               # Capa de acceso a datos (queries)
     ├── usecases.mjs         # Lógica de negocio (sin HTTP ni BD)
-    ├── handlers.mjs         # Adaptador HTTP (parsea POST, llama a usecases)
+    ├── handlers.mjs         # Adaptador HTTP (POST, llama a usecases)
     └── server.mjs           # Infraestructura: router, config, arranque
 
 
