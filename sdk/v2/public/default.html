@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Panel de Autenticación y Permisos</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      color: #222;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 1.6rem;
+      color: #333;
+    }
+
+    h2 {
+      font-size: 1.1rem;
+      margin-bottom: 14px;
+      color: #444;
+      border-bottom: 2px solid #ccc;
+      padding-bottom: 6px;
+    }
+
+    /* Cada sección temática */
+    .seccion {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+
+    /* Grilla de formularios dentro de una sección */
+    .grilla {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    /* Cada tarjeta de formulario */
+    .tarjeta {
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 16px;
+    }
+
+    .tarjeta h3 {
+      font-size: 0.95rem;
+      margin-bottom: 12px;
+      color: #555;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+      color: #666;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 7px 10px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+
+    button {
+      width: 100%;
+      padding: 8px;
+      background: #3a7bd5;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    button:hover {
+      background: #2f63b0;
+    }
+
+    /* Área de respuesta debajo de cada formulario */
+    .respuesta {
+      margin-top: 10px;
+      padding: 8px 10px;
+      border-radius: 4px;
+      font-size: 0.82rem;
+      display: none;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .respuesta.ok  { background: #e6f4ea; color: #2d6a2d; border: 1px solid #a8d5a2; }
+    .respuesta.err { background: #fdecea; color: #a62b2b; border: 1px solid #f5b7b1; }
+  </style>
+</head>
+<body>
+
+<h1>Panel de Autenticación y Permisos</h1>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SECCIÓN: AUTENTICACIÓN                                  -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="seccion">
+  <h2>Autenticación</h2>
+  <div class="grilla">
+
+    <!-- Registro público -->
+    <div class="tarjeta">
+      <h3>Registrar usuario</h3>
+      <label>Usuario</label>
+      <input type="text" id="reg-username" placeholder="mínimo 3 caracteres">
+      <label>Contraseña</label>
+      <input type="password" id="reg-password" placeholder="mínimo 6 caracteres">
+      <button onclick="registrarUsuario()">Registrar</button>
+      <div class="respuesta" id="resp-register"></div>
+    </div>
+
+    <!-- Login -->
+    <div class="tarjeta">
+      <h3>Iniciar sesión</h3>
+      <label>Usuario</label>
+      <input type="text" id="login-username">
+      <label>Contraseña</label>
+      <input type="password" id="login-password">
+      <button onclick="iniciarSesion()">Iniciar sesión</button>
+      <div class="respuesta" id="resp-login"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SECCIÓN: USUARIOS                                       -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="seccion">
+  <h2>Gestión de Usuarios</h2>
+  <div class="grilla">
+
+    <!-- Crear usuario (con rol) -->
+    <div class="tarjeta">
+      <h3>Crear usuario (admin)</h3>
+      <label>Usuario</label>
+      <input type="text" id="crear-username">
+      <label>Contraseña</label>
+      <input type="password" id="crear-password">
+      <label>Rol</label>
+      <select id="crear-rol">
+        <option value="1">admin</option>
+        <option value="2" selected>usuario</option>
+      </select>
+      <button onclick="crearUsuario()">Crear</button>
+      <div class="respuesta" id="resp-crear-usuario"></div>
+    </div>
+
+    <!-- Modificar usuario -->
+    <div class="tarjeta">
+      <h3>Modificar usuario</h3>
+      <label>ID del usuario</label>
+      <input type="number" id="mod-id" placeholder="id">
+      <label>Nuevo usuario</label>
+      <input type="text" id="mod-username">
+      <label>Nueva contraseña</label>
+      <input type="password" id="mod-password">
+      <label>Nuevo rol</label>
+      <select id="mod-rol">
+        <option value="1">admin</option>
+        <option value="2" selected>usuario</option>
+      </select>
+      <button onclick="modificarUsuario()">Modificar</button>
+      <div class="respuesta" id="resp-modificar-usuario"></div>
+    </div>
+
+    <!-- Eliminar usuario -->
+    <div class="tarjeta">
+      <h3>Eliminar usuario</h3>
+      <label>ID del usuario</label>
+      <input type="number" id="elim-usuario-id" placeholder="id">
+      <button onclick="eliminarUsuario()">Eliminar</button>
+      <div class="respuesta" id="resp-eliminar-usuario"></div>
+    </div>
+
+    <!-- Listar usuarios -->
+    <div class="tarjeta">
+      <h3>Listar todos los usuarios</h3>
+      <button onclick="listarUsuarios()">Listar</button>
+      <div class="respuesta" id="resp-listar-usuarios"></div>
+    </div>
+
+    <!-- Buscar usuario por ID -->
+    <div class="tarjeta">
+      <h3>Buscar usuario por ID</h3>
+      <label>ID del usuario</label>
+      <input type="number" id="buscar-id" placeholder="id">
+      <button onclick="buscarUsuarioPorId()">Buscar</button>
+      <div class="respuesta" id="resp-buscar-usuario"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SECCIÓN: ROLES                                          -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="seccion">
+  <h2>Gestión de Roles</h2>
+  <div class="grilla">
+
+    <!-- Crear rol -->
+    <div class="tarjeta">
+      <h3>Crear rol</h3>
+      <label>Nombre del rol</label>
+      <input type="text" id="crear-rol-nombre" placeholder="ej: moderador">
+      <button onclick="crearRol()">Crear</button>
+      <div class="respuesta" id="resp-crear-rol"></div>
+    </div>
+
+    <!-- Eliminar rol -->
+    <div class="tarjeta">
+      <h3>Eliminar rol</h3>
+      <label>ID del rol</label>
+      <input type="number" id="elim-rol-id" placeholder="id">
+      <label>Nombre del rol</label>
+      <input type="text" id="elim-rol-nombre" placeholder="necesario para validación">
+      <button onclick="eliminarRol()">Eliminar</button>
+      <div class="respuesta" id="resp-eliminar-rol"></div>
+    </div>
+
+    <!-- Listar roles -->
+    <div class="tarjeta">
+      <h3>Listar todos los roles</h3>
+      <button onclick="listarRoles()">Listar</button>
+      <div class="respuesta" id="resp-listar-roles"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SECCIÓN: PERMISOS                                       -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="seccion">
+  <h2>Gestión de Permisos</h2>
+  <div class="grilla">
+
+    <!-- Asignar permiso -->
+    <div class="tarjeta">
+      <h3>Asignar permiso a rol</h3>
+      <label>ID del rol</label>
+      <input type="number" id="perm-rol-id" placeholder="id del rol">
+      <label>Acción</label>
+      <input type="text" id="perm-accion" placeholder="ej: ver_reportes">
+      <button onclick="asignarPermiso()">Asignar</button>
+      <div class="respuesta" id="resp-asignar-permiso"></div>
+    </div>
+
+    <!-- Revocar permiso -->
+    <div class="tarjeta">
+      <h3>Revocar permiso</h3>
+      <label>ID del permiso</label>
+      <input type="number" id="revocar-id" placeholder="id del permiso">
+      <button onclick="revocarPermiso()">Revocar</button>
+      <div class="respuesta" id="resp-revocar-permiso"></div>
+    </div>
+
+    <!-- Listar permisos por rol -->
+    <div class="tarjeta">
+      <h3>Listar permisos de un rol</h3>
+      <label>ID del rol</label>
+      <input type="number" id="listar-perm-rol-id" placeholder="id del rol">
+      <button onclick="listarPermisosPorRol()">Listar</button>
+      <div class="respuesta" id="resp-listar-permisos"></div>
+    </div>
+
+  </div>
+</div>
+
+
+<script>
+  // ─────────────────────────────────────────────────────────
+  // FUNCIÓN AUXILIAR: muestra la respuesta del servidor
+  // debajo del formulario correspondiente.
+  // ─────────────────────────────────────────────────────────
+  function mostrarRespuesta(idElemento, data) {
+    const el = document.getElementById(idElemento);
+    el.style.display = 'block';
+    el.className = 'respuesta ' + (data.status ? 'ok' : 'err');
+    el.textContent = JSON.stringify(data, null, 2);
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // FUNCIÓN AUXILIAR: hace la petición HTTP y muestra resultado
+  // método: 'GET' | 'POST' | 'PUT' | 'DELETE'
+  // url: la ruta del servidor
+  // body: objeto con los datos (solo para POST y PUT)
+  // idRespuesta: id del div donde mostrar el resultado
+  // ─────────────────────────────────────────────────────────
+  async function peticion(metodo, url, body, idRespuesta) {
+    try {
+      const opciones = {
+        method: metodo,
+        headers: { 'Content-Type': 'application/json' }
+      };
+      // Solo POST y PUT tienen body
+      if (body) {
+        opciones.body = JSON.stringify(body);
+      }
+      const respuesta = await fetch(url, opciones);
+      const datos = await respuesta.json();
+      mostrarRespuesta(idRespuesta, datos);
+    } catch (err) {
+      mostrarRespuesta(idRespuesta, { status: false, message: 'Error de conexión: ' + err.message });
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // AUTENTICACIÓN
+  // ═══════════════════════════════════════════════════════
+
+  function registrarUsuario() {
+    peticion('POST', '/register', {
+      username: document.getElementById('reg-username').value,
+      password: document.getElementById('reg-password').value
+    }, 'resp-register');
+  }
+
+  function iniciarSesion() {
+    peticion('POST', '/login', {
+      username: document.getElementById('login-username').value,
+      password: document.getElementById('login-password').value
+    }, 'resp-login');
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // USUARIOS
+  // ═══════════════════════════════════════════════════════
+
+  function crearUsuario() {
+    peticion('POST', '/usuarios/crear', {
+      username: document.getElementById('crear-username').value,
+      password: document.getElementById('crear-password').value,
+      rol_id:   document.getElementById('crear-rol').value
+    }, 'resp-crear-usuario');
+  }
+
+  function modificarUsuario() {
+    peticion('PUT', '/usuarios/modificar', {
+      id:       document.getElementById('mod-id').value,
+      username: document.getElementById('mod-username').value,
+      password: document.getElementById('mod-password').value,
+      rol_id:   document.getElementById('mod-rol').value
+    }, 'resp-modificar-usuario');
+  }
+
+  function eliminarUsuario() {
+    const id = document.getElementById('elim-usuario-id').value;
+    peticion('DELETE', `/usuarios/eliminar?id=${id}`, null, 'resp-eliminar-usuario');
+  }
+
+  function listarUsuarios() {
+    peticion('GET', '/usuarios/listar', null, 'resp-listar-usuarios');
+  }
+
+  function buscarUsuarioPorId() {
+    const id = document.getElementById('buscar-id').value;
+    peticion('GET', `/usuarios/buscar?id=${id}`, null, 'resp-buscar-usuario');
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // ROLES
+  // ═══════════════════════════════════════════════════════
+
+  function crearRol() {
+    peticion('POST', '/roles/crear', {
+      nombre: document.getElementById('crear-rol-nombre').value
+    }, 'resp-crear-rol');
+  }
+
+  function eliminarRol() {
+    const id     = document.getElementById('elim-rol-id').value;
+    const nombre = document.getElementById('elim-rol-nombre').value;
+    peticion('DELETE', `/roles/eliminar?id=${id}&nombre=${nombre}`, null, 'resp-eliminar-rol');
+  }
+
+  function listarRoles() {
+    peticion('GET', '/roles/listar', null, 'resp-listar-roles');
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // PERMISOS
+  // ═══════════════════════════════════════════════════════
+
+  function asignarPermiso() {
+    peticion('POST', '/permisos/asignar', {
+      rol_id: document.getElementById('perm-rol-id').value,
+      accion: document.getElementById('perm-accion').value
+    }, 'resp-asignar-permiso');
+  }
+
+  function revocarPermiso() {
+    const id = document.getElementById('revocar-id').value;
+    peticion('DELETE', `/permisos/revocar?id=${id}`, null, 'resp-revocar-permiso');
+  }
+
+  function listarPermisosPorRol() {
+    const rol_id = document.getElementById('listar-perm-rol-id').value;
+    peticion('GET', `/permisos/listar?rol_id=${rol_id}`, null, 'resp-listar-permisos');
+  }
+</script>
+
+</body>
+</html>
