@@ -1,8 +1,0 @@
-{
-  "name": "practica-framework",
-  "version": "1.0.0",
-  "type": "module",
-  "dependencies": {
-    "sqlite3": "^5.1.7"
-  }
-}
