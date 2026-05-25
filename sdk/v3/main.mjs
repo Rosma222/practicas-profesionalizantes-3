@@ -47,7 +47,7 @@ function parseBody(request) {
     });
 }
 
-// COMPONENTE AUTORIZADOR REAL (Punto 1)
+// COMPONENTE AUTORIZADOR (Punto 1)
 //  user -> members -> access -> endpoint
 function comprobar_permiso_real(username, path) {
     const query = `
