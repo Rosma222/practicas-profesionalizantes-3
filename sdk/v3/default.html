@@ -2,116 +2,295 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Sistema de acceso</title>
+    <title>Proyecto SDK v3 - Sistema de Acceso</title>
+
     <style>
-        body        { font-family: monospace; max-width: 480px; margin: 40px auto; padding: 0 16px; }
-        h2          { margin-top: 28px; font-size: 1em; text-transform: uppercase; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
-        input       { display: block; width: 100%; box-sizing: border-box; margin-bottom: 6px; padding: 6px; }
-        button      { margin: 4px 4px 4px 0; padding: 6px 14px; cursor: pointer; }
-        #status     { margin-top: 8px; font-size: 0.85em; color: #555; }
-        #resultado  { margin-top: 14px; padding: 8px; background: #f5f5f5; border-left: 3px solid #999; font-size: 0.9em; min-height: 24px; white-space: pre-wrap; }
+
+        body
+        {
+            font-family: monospace;
+            max-width: 480px;
+            margin: 40px auto;
+            padding: 0 16px;
+        }
+
+        h2
+        {
+            margin-top: 28px;
+            font-size: 1em;
+            text-transform: uppercase;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 4px;
+        }
+
+        input
+        {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 6px;
+            padding: 6px;
+        }
+
+        button
+        {
+            margin: 4px 4px 4px 0;
+            padding: 6px 14px;
+            cursor: pointer;
+        }
+
+        #status
+        {
+            margin-top: 8px;
+            font-size: 0.85em;
+            color: #555;
+        }
+
+        #resultado
+        {
+            margin-top: 14px;
+            padding: 8px;
+            background: #f5f5f5;
+            border-left: 3px solid #999;
+            font-size: 0.9em;
+            min-height: 24px;
+            white-space: pre-wrap;
+        }
+
     </style>
 </head>
+
 <body>
 
+
+<!-- REGISTRO -->
     <h2>Registro de usuario</h2>
-    <input id="reg-user" placeholder="Usuario">
-    <input id="reg-pass" placeholder="Contraseña" type="password">
-    <button onclick="registrar()">Crear usuario</button>
 
+    <input
+        id="reg-user"
+        placeholder="Usuario"
+    >
+
+    <input
+        id="reg-pass"
+        placeholder="Contraseña"
+        type="password"
+    >
+
+    <button onclick="registrar()">
+        Crear usuario
+    </button>
+
+
+<!-- LOGIN -->
     <h2>Login</h2>
-    <input id="log-user" placeholder="Usuario">
-    <input id="log-pass" placeholder="Contraseña" type="password">
-    <button onclick="hacerLogin()">Iniciar Sesión</button>
-    <button onclick="hacerLogout()">Cerrar Sesión</button>
-    <div id="status">No estás logueado.</div>
 
+    <input
+        id="log-user"
+        placeholder="Usuario"
+    >
+
+    <input
+        id="log-pass"
+        placeholder="Contraseña"
+        type="password"
+    >
+
+    <button onclick="hacerLogin()">
+        Iniciar Sesión
+    </button>
+
+    <button onclick="hacerLogout()">
+        Cerrar Sesión
+    </button>
+
+    <div id="status">
+        No estás logueado.
+    </div>
+
+
+<!-- ACCIONES PROTEGIDAS -->
+   
     <h2>Ejecutar Acciones</h2>
-    <button onclick="llamar('/print')">/print</button>
-    <button onclick="llamar('/log')">/log</button>
-    <button onclick="llamar('/help')">/help</button>
-    <button onclick="llamar('/sayHello')">/sayHello</button>
-    <button onclick="llamar('/sayBye')">/sayBye</button>
 
+    <button onclick="llamar('/print')">
+        /print
+    </button>
+
+    <button onclick="llamar('/log')">
+        /log
+    </button>
+
+    <button onclick="llamar('/help')">
+        /help
+    </button>
+
+    <button onclick="llamar('/sayHello')">
+        /sayHello
+    </button>
+
+    <button onclick="llamar('/sayBye')">
+        /sayBye
+    </button>
+
+  
+<!-- RESULTADO -->
+   
     <h2>Resultado de la Operación</h2>
-    <div id="resultado">Esperando acción del usuario...</div>
+
+    <div id="resultado">
+        Esperando acción del usuario...
+    </div>
 
 <script>
-    let usuarioActual = null;
 
-    function mostrar(texto, esError) {
-        const contenedor = document.getElementById('resultado');
+
+// CONTEXTO DE SESIÓN DEL CLIENTE: Guarda el username actualmente logueado.
+   
+    let usuarioActual = null; // inicia sin sesion activa, por eso es null
+
+    // FUNCIÓN AUX P/ MOSTRAR MENSAJES
+    function mostrar(texto, esError)
+    {
+        const contenedor =  document.getElementById('resultado');
         contenedor.textContent = texto;
-        contenedor.style.borderLeftColor = esError ? 'red' : 'green';
-    }
 
-    async function registrar() {
-        const u = document.getElementById('reg-user').value;
-        const p = document.getElementById('reg-pass').value;
-
-        const resp = await fetch('/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: u, password: p })
-        });
-        const data = await resp.json();
-        if (resp.ok) mostrar(data.message, false);
-        else mostrar('Error: ' + data.error, true);
-    }
-
-    async function hacerLogin() {
-        const u = document.getElementById('log-user').value;
-        const p = document.getElementById('log-pass').value;
-
-        const resp = await fetch('/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: u, password: p })
-        });
-        const data = await resp.json();
-
-        if (resp.ok) {
-            usuarioActual = u;
-            document.getElementById('status').textContent = `Logueado como: ${u}`;
-            mostrar('Sesión inicializada en el contexto de ejecución.', false);
-        } else {
-            mostrar('Falla de autenticación: ' + data.error, true);
+        if (esError){
+            contenedor.style.borderLeftColor = 'red';
+        }
+        else{
+            contenedor.style.borderLeftColor = 'green';
         }
     }
 
-    async function hacerLogout() {
-        if (!usuarioActual) { mostrar('No hay sesión activa.', true); return; }
 
-        await fetch('/logout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: usuarioActual })
-        });
+// REGISTRO
 
-        usuarioActual = null;
-        document.getElementById('status').textContent = 'No estás logueado.';
-        mostrar('Sesión destruida de la memoria.', false);
+    async function registrar()
+    {
+        const username =  document.getElementById('reg-user').value;
+        const password = document.getElementById('reg-pass').value;
+
+        try{
+            const response = await fetch('/register',
+            {
+                method: 'POST',
+                headers:{ 'Content-Type': 'application/json'},
+                body: JSON.stringify ({username: username, password: password})
+            });
+
+            const data = await response.json();
+
+            if (response.ok){
+                mostrar(data.message, false);
+            }
+            else{
+                mostrar ('Error: ' + data.error, true);
+            }
+        }
+        catch(error) {
+            mostrar ('Error conectando con el servidor.',true );
+        }
     }
 
+
+// LOGIN
+
+    async function hacerLogin(){
+        const username = document.getElementById('log-user').value;
+        const password = document.getElementById('log-pass').value;
+
+        try{
+            const response = await fetch('/login',
+            {
+                method: 'POST',
+                headers:{'Content-Type': 'application/json'},
+                body: JSON.stringify ({username: username,password: password})
+            });
+
+            const data = await response.json();
+
+            if (response.ok){
+                usuarioActual = username; // Se guarda el usuario actual en el frontend.
+
+                document.getElementById('status')
+                    .textContent =
+                    'Logueado como: ' + username;
+
+                mostrar ('Sesión habilitada correctamente.', false);
+            }
+            else{
+                mostrar ( 'Falla de autenticación: ' + data.error, true );
+            }
+        }
+        catch(error){
+              mostrar ('Error conectando con el servidor.',true);
+        }
+    }
+
+// LOGOUT
+
+    async function hacerLogout()    {
+        if (!usuarioActual)
+        {
+            mostrar('No hay sesión activa.', true);
+            return;
+        }
+
+        try{
+            const response = await fetch('/logout',{
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify ({username: usuarioActual})
+            });
+
+            const data = await response.json();
+
+            if (response.ok){
+                usuarioActual = null; // El frontend olvida el usuario actual, pero en el servidor la sesión NO se borra, se deshabilita.
+                document.getElementById('status')
+                    .textContent ='No estás logueado.';
+
+                mostrar ('Sesión deshabilitada.', false);
+            }
+            else{
+                mostrar(data.error, true);
+            }
+        }
+        catch(error){
+            mostrar('Error conectando con el servidor.', true );
+        }
+    }
+
+// LLAMADAS A ENDPOINTS PROTEGIDOS
     async function llamar(endpoint) {
-        if (!usuarioActual) {
+        if (!usuarioActual){
             mostrar('Aviso: Primero tenés que loguearte.', true);
             return;
         }
 
-        const resp = await fetch(endpoint, {
-            method: 'POST', 
-            headers: { 'x-username': usuarioActual }
-        });
+        try {
+            const response = await fetch(endpoint,
+            {
+                method: 'POST',
+                headers:{'x-username': usuarioActual }
+            });
 
-        const data = await resp.json();
+            const data = await response.json();
 
-        if (resp.ok) {
-            mostrar(data.message, false); // Acceso exitoso
-        } else {
-            mostrar('Cartel de Aviso del Servidor:\n' + data.error, true); // Aviso de acceso denegado
+            if (response.ok){
+                mostrar(data.message, false );
+            }
+            else{
+                mostrar('Cartel de Aviso del Servidor:\n' + data.error, true );
+            }
+        }
+        catch(error){
+            mostrar('Error conectando con el servidor.', true );
         }
     }
+
 </script>
+
 </body>
 </html>
