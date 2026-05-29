@@ -352,38 +352,40 @@ function sayBye_handler(request, response){
 }
 
 
-// ROUTER: Mapea rutas a handlers
+//ROUTER: Mapea rutas a handlers... Cada entrada tiene dos campos:
+//  handler – procesa la request
+//  protected – true si el dispatcher debe verificar sesión y autorización antes dar control al handler
+// Agregar un nuevo endpoint protegido requiere tocar este solo lugar
 
 const router = new Map();
 
-router.set('/',         default_handler);
+router.set('/',         { handler: default_handler,     protected: false });
 
-router.set('/register', register_handler);
-router.set('/login',    login_handler);
-router.set('/logout',   logout_handler);
+router.set('/register', { handler: register_handler,    protected: false });
+router.set('/login',    { handler: login_handler,        protected: false });
+router.set('/logout',   { handler: logout_handler,       protected: false });
 
-router.set('/print',    print_handler);
-router.set('/log',      log_handler);
-router.set('/help',     help_handler);
-router.set('/sayHello', sayHello_handler);
-router.set('/sayBye',   sayBye_handler);
+router.set('/print',    { handler: print_handler,        protected: true  });
+router.set('/log',      { handler: log_handler,          protected: true  });
+router.set('/help',     { handler: help_handler,         protected: true  });
+router.set('/sayHello', { handler: sayHello_handler,     protected: true  });
+router.set('/sayBye',   { handler: sayBye_handler,       protected: true  });
 
 
 // DESPACHADOR: Middleware del autorizador
-
 function request_dispatcher(request, response){
-    response.setHeader('Access-Control-Allow-Origin', '*'); //permite cualquier origen
-    response.setHeader( 'Access-Control-Allow-Headers','Content-Type, x-username'); 
+    response.setHeader('Access-Control-Allow-Origin', '*');
+    response.setHeader('Access-Control-Allow-Headers','Content-Type, x-username'); 
 
     const url = new URL(
         request.url,
         'http://' + config.server.ip
     );
 
-    const path = url.pathname;
-    const handler = router.get(path);
+    const path  = url.pathname;
+    const route = router.get(path);  // ahora route es { handler, protected }
 
-    if (!handler){
+    if (!route){
         response.writeHead(404,{ 'Content-Type': 'application/json'});
         response.end(JSON.stringify(
         {
@@ -392,26 +394,16 @@ function request_dispatcher(request, response){
         return;
     }
 
-    // Endpoints protegidos: Requieren autenticación y autorización
-    const endpointsProtegidos = [
-                                    '/print',
-                                    '/log',
-                                    '/help',
-                                    '/sayHello',
-                                    '/sayBye'
-                                ];
-
-    if (endpointsProtegidos.includes(path)){
+    // Si mañana agrego un nuevo endpoint, solo se toca el router.set() de arriba.
+    if (route.protected){
         if (request.method !== 'POST'){
             response.writeHead(405,{'Content-Type': 'application/json'});
             response.end(JSON.stringify(
             {
-                error: 'Método RPC no válido. Use POST.'
+                error: 'Método no válido. Use POST.'
             }));
-
             return;
         }
-
         const username = request.headers['x-username']; 
      
         // VALIDACIÓN DE SESIÓN
@@ -421,10 +413,8 @@ function request_dispatcher(request, response){
             {
                 error: 'Acceso Denegado: Falta username.'
             }));
-
             return;
         }
-
         const currentSession = sesiones.get(username);
 
         // Verifica existencia de sesión
@@ -434,7 +424,6 @@ function request_dispatcher(request, response){
             {
                 error: 'Acceso Denegado: Tenés que iniciar sesión.'
             }));
-
             return;
         }
 
@@ -445,13 +434,10 @@ function request_dispatcher(request, response){
             {
                 error: 'La sesión está deshabilitada.'
             }));
-
             return;
         }
 
-
         // AUTORIZADOR: Verifica permisos en la base de datos
-
         const autorizado = comprobar_permiso_real(username, path);
 
         if (!autorizado){
@@ -462,14 +448,11 @@ function request_dispatcher(request, response){
                 `Aviso: El usuario '${username}' ` +
                 `no está autorizado para acceder a ${path}.`
             }));
-
             return;
         }
     }
-
-    return handler(request, response);
+    return route.handler(request, response);  //  route.handler en lugar de handler
 }
-
 
 // LEVANTAR SERVIDOR
 function start(){
@@ -479,7 +462,6 @@ function start(){
 }
 
 const server = createServer(request_dispatcher);
-
 server.listen(
     config.server.port,
     config.server.ip,
