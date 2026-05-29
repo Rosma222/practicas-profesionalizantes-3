@@ -3,6 +3,7 @@ import { URL } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { resolve } from 'node:path';
+import { createHash } from 'node:crypto'; // P/hashear contraseñas, modulo nativo de node en lugar de `crypto.subtle`
 
 
 // CONFIGURACIÓN
@@ -43,8 +44,15 @@ function connect_db(path){
 const db = connect_db(config.database.path);
 
 
-// SESIONES EN MEMORIA || El Map almacena:  username -> objeto UserSession
 
+// HASH SHA-256 - Cifrado irreversible: imposible recuperar el original
+// Se usa al registrar y al autenticar: compara hash con hash.
+function hashSHA256(cadena){
+    return createHash('sha256').update(cadena).digest('hex');
+}
+
+
+// SESIONES EN MEMORIA || El Map almacena:  username -> objeto UserSession
 const sesiones = new Map();
 
 // Clase de sesión: para manejar estados de sesión
@@ -63,7 +71,6 @@ function parseBody(request) {
         request.on('data', function(chunk){
             body += chunk.toString();
         });
-
         request.on('end', function() {
             try {
                 resolve(JSON.parse(body));
@@ -72,29 +79,28 @@ function parseBody(request) {
                 resolve(Object.fromEntries(new URLSearchParams(body)));
             }
         });
-
         request.on('error', reject);
     });
 }
 
-
-// AUTENTICACIÓN : Verifica si existe el usuario en la base de datos
+// AUTENTICACIÓN: Verifica si existe el usuario en la base de datos.
 
 function authenticate(username, password){
     const sql = `
         SELECT COUNT(*) as total
         FROM user
         WHERE username = ?
-        AND password = ?
+        AND key = ?
     `;
 
-    try{ 
+    try{
         const stmt = db.prepare(sql);
-        const resultado = stmt.get(username, password);
+        const hashedPassword = hashSHA256(password);// La contraseña recibida se hashea antes de comparar,
+        const resultado = stmt.get(username, hashedPassword);  //en la BD ahora se almacena el hash,nunca el texto plano
         return resultado.total === 1;
     }
     catch(error){
-           return false;
+        return false;
     }
 }
 
@@ -123,10 +129,13 @@ function comprobar_permiso_real(username, path){
 
 function createUser(username, password)
 {
-    // 1. Inserta usuario en tabla user
-    const stmtUser = db.prepare( 'INSERT INTO user (username, password) VALUES (?, ?)');
+    // 1. Hashea la contraseña antes de persistirla. El 'password' (texto plano) ya no se usa.
+    const hashedPassword = hashSHA256(password);
 
-    const resultadoUser = stmtUser.run(username, password); 
+    // 2. Inserta usuario en tabla user con la contraseña hasheada en columna 'key'
+    const stmtUser = db.prepare( 'INSERT INTO user (username, key) VALUES (?, ?)');
+
+    const resultadoUser = stmtUser.run(username, hashedPassword);
     const nuevoUserId = resultadoUser.lastInsertRowid; // Obtiene el ID del nuevo usuario insertado
 
     // 2. Lo asocia automáticamente al grupo 1
@@ -288,8 +297,7 @@ async function logout_handler(request, response){
 
     try {
         const body = await parseBody(request);
-        //  logout NO elimina la sesión.
-        // Solamente la deshabilita.
+        //  logout NO elimina la sesión, la deshabilita.
         logout(body.username);
 
         response.writeHead(200,{'Content-Type': 'application/json'});
@@ -373,6 +381,7 @@ router.set('/sayBye',   { handler: sayBye_handler,       protected: true  });
 
 
 // DESPACHADOR: Middleware del autorizador
+
 function request_dispatcher(request, response){
     response.setHeader('Access-Control-Allow-Origin', '*');
     response.setHeader('Access-Control-Allow-Headers','Content-Type, x-username'); 
@@ -400,10 +409,12 @@ function request_dispatcher(request, response){
             response.writeHead(405,{'Content-Type': 'application/json'});
             response.end(JSON.stringify(
             {
-                error: 'Método no válido. Use POST.'
+                error: 'Método RPC no válido. Use POST.'
             }));
+
             return;
         }
+
         const username = request.headers['x-username']; 
      
         // VALIDACIÓN DE SESIÓN
@@ -413,8 +424,10 @@ function request_dispatcher(request, response){
             {
                 error: 'Acceso Denegado: Falta username.'
             }));
+
             return;
         }
+
         const currentSession = sesiones.get(username);
 
         // Verifica existencia de sesión
@@ -424,6 +437,7 @@ function request_dispatcher(request, response){
             {
                 error: 'Acceso Denegado: Tenés que iniciar sesión.'
             }));
+
             return;
         }
 
@@ -434,6 +448,7 @@ function request_dispatcher(request, response){
             {
                 error: 'La sesión está deshabilitada.'
             }));
+
             return;
         }
 
@@ -448,11 +463,14 @@ function request_dispatcher(request, response){
                 `Aviso: El usuario '${username}' ` +
                 `no está autorizado para acceder a ${path}.`
             }));
+
             return;
         }
     }
+
     return route.handler(request, response);  //  route.handler en lugar de handler
 }
+
 
 // LEVANTAR SERVIDOR
 function start(){
@@ -462,6 +480,7 @@ function start(){
 }
 
 const server = createServer(request_dispatcher);
+
 server.listen(
     config.server.port,
     config.server.ip,
