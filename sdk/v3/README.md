@@ -2,6 +2,34 @@
 
 ### Es un servidor web que funciona como un **sistema de login y permisos**. Solo permite que usuarios autorizados accedan a ciertas funciones del sistema.
 
+29/05/2026
+- cambios: 
+1. Router: ahora se guarda un objeto c/2 campos
+```js
+// Antes
+router.set('/log', log_handler);
+
+// Ahora
+router.set('/log', { handler: log_handler, protected: true }); 
+```
+2. Dispatcher: eliminé ´endpointsProtegidos` y ahora se usa una todo en una consulta al route
+``` js
+// Antes
+const handler = router.get(path);
+if (endpointsProtegidos.includes(path)) { ... }
+return handler(request, response);
+
+// Ahora
+const route = router.get(path);
+if (route.protected) { ... }
+return route.handler(request, response);
+```
+Asi si tengo que agregar otro endpoint protegido lo hago desde aca:
+```js
+router.set('/nuevoEndpointProtected', { handler: nuevoEndpointProtected_handler, protected: true });
+```
+
+
 ## Archivos 
 
 | Archivo | Propósito |
