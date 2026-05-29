@@ -3,6 +3,31 @@
 ### Es un servidor web que funciona como un **sistema de login y permisos**. Solo permite que usuarios autorizados accedan a ciertas funciones del sistema.
 
 29/05/2026
+* TAREA: Efectúe una modificación con respecto al almacenamiento de las contraseñas de los usuarios. Actualmente son textos planos visibles en la base de datos. Modifique el alta de usuario de modo tal que la contraseña se guarde de manera cifrada empleando cifrado irreversible (SHA256). Adecúe la función de autenticación según corresponda. 
+1. Import — se agregó `createHash` de `node:crypto`
+2. Nueva función hashSHA256()
+```js
+function hashSHA256(cadena){
+    return createHash('sha256').update(cadena).digest('hex');
+} 
+```
+3. En createUser(): Hashea la contraseña con SHA-256 antes de insertarla en la BD. Guardar el hash, no el texto plano
+```js
+const hashedPassword = hashSHA256(password);
+db.prepare('INSERT INTO user (username, key) VALUES (?, ?)');
+stmtUser.run(username, hashedPassword);  // nunca se persiste el texto plano
+```
+4. En authenticate(): Hashear la contraseña que llega antes de compararla con la BD. 
+Compara siempre será hash vs hash.
+```js 
+const hashedPassword = hashSHA256(password);
+stmt.get(username, hashedPassword);  // hash vs hash 
+```
+5. En la base de datos: Renombrar la columna password a key en la tabla user
+
+--------------------------------------------------------------------------------------------------------------------
+
+28/05/2026
 - cambios: 
 1. Router: ahora se guarda un objeto c/2 campos
 ```js
