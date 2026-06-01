@@ -403,72 +403,86 @@ function request_dispatcher(request, response){
         return;
     }
 
-    // Si mañana agrego un nuevo endpoint, solo se toca el router.set() de arriba.
-    if (route.protected){
-        if (request.method !== 'POST'){
-            response.writeHead(405,{'Content-Type': 'application/json'});
+    // Se pone por defecto: acceso DENEGADO.
+    // Solo se habilita si supera TODAS las validaciones
+    let permitido = false;
+
+    if (route.protected)
+    {
+        // método correcto
+        if (request.method !== 'POST')
+        {
+            response.writeHead(405, {'Content-Type': 'application/json'});
             response.end(JSON.stringify(
             {
                 error: 'Método RPC no válido. Use POST.'
             }));
-
             return;
         }
 
-        const username = request.headers['x-username']; 
-     
-        // VALIDACIÓN DE SESIÓN
-        if (!username){
-            response.writeHead(401,{'Content-Type': 'application/json'});
+        const username = request.headers['x-username'];
+
+        // VALIDACIÓN DE SESIÓN 
+        if (!username)
+        {
+            response.writeHead(401, {'Content-Type': 'application/json'});
             response.end(JSON.stringify(
             {
                 error: 'Acceso Denegado: Falta username.'
             }));
-
             return;
         }
 
         const currentSession = sesiones.get(username);
 
         // Verifica existencia de sesión
-        if (!currentSession){
-            response.writeHead(401,{'Content-Type': 'application/json'});
+        if (!currentSession)
+        {
+            response.writeHead(401, {'Content-Type': 'application/json'});
             response.end(JSON.stringify(
             {
                 error: 'Acceso Denegado: Tenés que iniciar sesión.'
             }));
-
             return;
         }
 
         // Verifica estado habilitado
-        if (currentSession.status !== 'enabled'){
-            response.writeHead(401,{'Content-Type': 'application/json'});
+        if (currentSession.status !== 'enabled')
+        {
+            response.writeHead(401, {'Content-Type': 'application/json'});
             response.end(JSON.stringify(
             {
                 error: 'La sesión está deshabilitada.'
             }));
-
             return;
         }
 
         // AUTORIZADOR: Verifica permisos en la base de datos
         const autorizado = comprobar_permiso_real(username, path);
 
-        if (!autorizado){
-            response.writeHead(403,{'Content-Type': 'application/json'});
+        if (!autorizado)
+        {
+            response.writeHead(403, {'Content-Type': 'application/json'});
             response.end(JSON.stringify(
             {
-                error:
-                `Aviso: El usuario '${username}' ` +
-                `no está autorizado para acceder a ${path}.`
+                error: `Aviso: El usuario '${username}' no está autorizado para acceder a ${path}.`
             }));
-
             return;
         }
+
+        // Todas superadas: se habilita el acceso
+        permitido = true;
+    }
+    else
+    {
+        // Ruta pública: se habilita directamente
+        permitido = true;
     }
 
-    return route.handler(request, response);  //  route.handler en lugar de handler
+    if (permitido)
+    {
+        return route.handler(request, response); //  route.handler en lugar de handler
+    }
 }
 
 
