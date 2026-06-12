@@ -57,8 +57,8 @@ class UserSession {
 }
 
 
-// PARSEADOR DE BODY - Soporta JSON y URL-encoded
-function parseBody(request) {
+// PARSEADOR DE BODY - Acepta SOLO JSON
+async function parseBody(request) {
     return new Promise(function(resolve, reject) {
         let body = '';
 
@@ -67,14 +67,22 @@ function parseBody(request) {
         });
         request.on('end', function() {
             try {
-                resolve(JSON.parse(body));
+                // Forzar JSON: si viene vacío, devolvemos {} para facilitar handlers
+                const parsed = body && body.length ? JSON.parse(body) : {};
+                resolve(parsed);
             }
-            catch{
-                resolve(Object.fromEntries(new URLSearchParams(body)));
+            catch(err){
+                reject(new Error('Invalid JSON'));
             }
         });
         request.on('error', reject);
     });
+}
+
+// Helper para respuestas de error según la especificación solicitada
+function sendError(response, code, exception, details){
+    response.writeHead(code, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({ exception: exception, detail: Array.isArray(details) ? details : [details] }));
 }
 
 // AUTENTICACIÓN: Verifica si existe el usuario en la base de datos.
@@ -116,18 +124,14 @@ function comprobar_permiso_real(username, path){
     return resultado.total > 0; // Si el conteo es mayor a 0, el usuario tiene permiso.
 }
 
-
 function createUser(username, password)
 {
-    // 1. Hashea la contraseña antes de persistirla. El 'password' (texto plano) ya no se usa.
     const hashedPassword = hashSHA256(password);
 
-    // 2. Inserta usuario en tabla user con la contraseña hasheada en columna 'key'
     const stmtUser = db.prepare( 'INSERT INTO user (username, key) VALUES (?, ?)');
     const resultadoUser = stmtUser.run(username, hashedPassword);
-    const nuevoUserId = resultadoUser.lastInsertRowid; // Obtiene el ID del nuevo usuario insertado
+    const nuevoUserId = resultadoUser.lastInsertRowid;
 
-    // 2. Lo asocia automáticamente al grupo 1
     const stmtMember = db.prepare( 'INSERT INTO members (id_user, id_group) VALUES (?, 1)' );
     stmtMember.run(nuevoUserId);
 
@@ -136,7 +140,6 @@ function createUser(username, password)
     };
 }
 
-// LOGIN: Maneja autenticación y sesiones.
 function login(username, password) {
     const isAuthenticated = authenticate(username, password);
 
@@ -144,20 +147,16 @@ function login(username, password) {
         return null;
     }
 
-    // Busca si ya existe una sesión previa
     let currentSession = sesiones.get(username);
-    // Si nunca inició sesión, crea una nueva
     if (currentSession == null){
         currentSession = new UserSession();
         sesiones.set(username, currentSession);
     }
 
-    // Habilita sesión
     currentSession.status = 'enabled';
     return currentSession;
 }
 
-// LOGOUT : la sesión permanece pero queda deshabilitada
 function logout(username){
     const currentSession = sesiones.get(username);
     if (currentSession) {
@@ -166,83 +165,82 @@ function logout(username){
     return true;
 }
 
-// HANDLERS PÚBLICOS: No requieren autenticación ni autorización
-
 // REGISTER HANDLER
 async function register_handler(request, response){
-       if (request.method !== 'POST'){
-        response.writeHead(405,{ 'Content-Type': 'application/json'});
-        response.end(JSON.stringify({ error: 'Método no permitido. Use POST.' }));
+    if (request.method !== 'POST'){
+        sendError(response,400,'InvalidRequest','Método no permitido. Use POST.');
         return;
     }
 
     try {
-        const body = await parseBody(request);
+        const body = request._body || await parseBody(request);
+        if (!body || !body.username || !body.password){
+            sendError(response,400,'InvalidRequest',['Faltan campos username o password']);
+            return;
+        }
+
         const resultado = createUser(body.username, body.password);
         response.writeHead(200, { 'Content-Type': 'application/json' });
         response.end(JSON.stringify(resultado));
     }
-    catch {
-        response.writeHead(400, { 'Content-Type': 'application/json' });
-        response.end(JSON.stringify({error: 'El usuario ya existe o hubo un error.'}));   
+    catch (err) {
+        // Error del dominio (usuario ya existe, constraints, etc.) -> 422
+        sendError(response,422,'DomainError', err.message || 'El usuario ya existe o hubo un error.');
     }
 }
-
 
 // LOGIN HANDLER
 async function login_handler(request, response){
     if (request.method !== 'POST') {
-        response.writeHead(405,{ 'Content-Type': 'application/json'});
-        response.end(JSON.stringify({ error: 'Método no permitido. Use POST.'})); 
+        sendError(response,400,'InvalidRequest','Método no permitido. Use POST.');
         return;
     }
 
     try{
-        const body = await parseBody(request);
-        const session = login(
-            body.username,
-            body.password);
+        const body = request._body || await parseBody(request);
+        if (!body || !body.username || !body.password){
+            sendError(response,400,'InvalidRequest',['Faltan campos username o password']);
+            return;
+        }
+
+        const session = login(body.username, body.password);
         if (session){
             response.writeHead(200, {'Content-Type': 'application/json' });
-            response.end(JSON.stringify({ok: true, message: 'Login exitoso.' }));          
+            response.end(JSON.stringify({ok: true, message: 'Login exitoso.' }));
         }
         else{
-            response.writeHead(401, { 'Content-Type': 'application/json' });
-            response.end(JSON.stringify(
-            {
-                error: 'Credenciales incorrectas.'
-            }));
+            sendError(response,401,'AccessDenied','Credenciales incorrectas.');
         }
     }
-    catch {
-        response.writeHead(400,{ 'Content-Type': 'application/json'});
-        response.end(JSON.stringify(  { error: 'Error en el login.'}));   
-       
+    catch (err) {
+        sendError(response,400,'InvalidRequest', err.message || 'Error en el login.');
     }
 }
-
 
 // LOGOUT HANDLER
 async function logout_handler(request, response){
     if (request.method !== 'POST'){
-        response.writeHead(405, {'Content-Type': 'application/json' });
-        response.end(JSON.stringify({error: 'Método no permitido. Use POST.' }));
+        sendError(response,400,'InvalidRequest','Método no permitido. Use POST.');
         return;
     }
 
- // En este ejemplo usa x-username para logout también
-    const username = request.headers['x-username'];
+    try{
+        const body = request._body || await parseBody(request);
+        const username = body && body.username;
+        if (!username){
+            sendError(response,401,'AccessDenied','Falta username.');
+            return;
+        }
 
-    if (!username) {
-        response.writeHead(401, {'Content-Type': 'application/json' });
-        response.end(JSON.stringify({ error: 'Acceso Denegado: Falta username.' }));
-        return;
+        logout(username);
+
+        response.writeHead(200, {'Content-Type': 'application/json'});
+        response.end(JSON.stringify({ ok: true, message: 'Sesión deshabilitada.' }));
     }
-
-    logout(username);
-
-    response.writeHead(200, {'Content-Type': 'application/json'});
-    response.end(JSON.stringify({ ok: true, message: 'Sesión deshabilitada.' }));
+    catch(err){
+        sendError(response,400,'InvalidRequest', err.message || 'Error al cerrar sesión.');
+    }
+}
 
 // HANDLERS DE ACCIONES PROTEGIDAS
 function print_handler(request, response){
@@ -253,18 +251,16 @@ function print_handler(request, response){
 function log_handler(request, response){
     response.writeHead(200,{'Content-Type': 'application/json'});
     response.end(JSON.stringify({message: 'Acción ejecutada: /log de forma satisfactoria.' }));
-   
 }
 
 function help_handler(request, response){
     response.writeHead(200,{'Content-Type': 'application/json'});
     response.end(JSON.stringify({ message: 'Acción ejecutada: /help de forma satisfactoria.'}));
-    
 }
 
 function sayHello_handler(request, response){
     response.writeHead(200,{'Content-Type': 'application/json'});
-    response.end(JSON.stringify({ message: 'Acción ejecutada: /sayHello de forma satisfactoria.'}));   
+    response.end(JSON.stringify({ message: 'Acción ejecutada: /sayHello de forma satisfactoria.'}));
 }
 
 function sayBye_handler(request, response){
@@ -272,108 +268,95 @@ function sayBye_handler(request, response){
     response.end(JSON.stringify({ message: 'Acción ejecutada: /sayBye de forma satisfactoria.' }));
 }
 
-
-//ROUTER: Mapea rutas a handlers... Cada entrada tiene dos campos:
-//  handler – procesa la request
-//  protected – true si el dispatcher debe verificar sesión y autorización antes dar control al handler
-// Agregar un nuevo endpoint protegido requiere tocar este solo lugar
-
 const router = new Map();
 
-//router.set('/',         { handler: default_handler,     protected: false });
+router.set('/Register', { handler: register_handler,    protected: false });
+router.set('/Login',    { handler: login_handler,        protected: false });
+router.set('/Logout',   { handler: logout_handler,       protected: true, permissionRequired: false });
+router.set('/Print',    { handler: print_handler,        protected: true  });
+router.set('/Log',      { handler: log_handler,          protected: true  });
+router.set('/Help',     { handler: help_handler,         protected: true  });
+router.set('/SayHello', { handler: sayHello_handler,     protected: true  });
+router.set('/SayBye',   { handler: sayBye_handler,       protected: true  });
 
-router.set('/register', { handler: register_handler,    protected: false });
-router.set('/login',    { handler: login_handler,        protected: false });
-router.set('/logout',   { handler: logout_handler,       protected: true, permissionRequired: false });
-router.set('/print',    { handler: print_handler,        protected: true  });
-router.set('/log',      { handler: log_handler,          protected: true  });
-router.set('/help',     { handler: help_handler,         protected: true  });
-router.set('/sayHello', { handler: sayHello_handler,     protected: true  });
-router.set('/sayBye',   { handler: sayBye_handler,       protected: true  });
-
-
-// DESPACHADOR: Middleware del autorizador
-function request_dispatcher(request, response){
+// DESPACHADOR: Middleware del autorizador (ahora async para parsear body cuando sea necesario)
+async function request_dispatcher(request, response){
     response.setHeader('Access-Control-Allow-Origin', '*');
-    response.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     response.setHeader('Access-Control-Allow-Headers','Content-Type, x-username');
+    // Cabecera de versión requerida
+    response.setHeader('X-API-Version','4.2');
 
-     if (request.method === 'OPTIONS'){ //preflight request: el navegador pregunta q métodos y headers están permitidos antes de hacer la petición
-        response.writeHead(200); response.end();     
+    if (request.method === 'OPTIONS'){
+        response.writeHead(200); response.end();
         return;
     }
 
     const url = new URL( request.url,'http://' + config.server.ip);
     const path  = url.pathname;
-    const route = router.get(path);  // ahora route es { handler, protected }
+    const route = router.get(path);
 
     if (!route){
-        response.writeHead(404,{ 'Content-Type': 'application/json'});
-        response.end(JSON.stringify({error: 'Ruta no encontrada.'}));  
+        sendError(response,400,'InvalidRequest','Ruta no encontrada.');
         return;
     }
 
-    // Se pone por defecto: acceso DENEGADO.
-    // Solo se habilita si supera TODAS las validaciones
-    let permitido = false;
-
+    // Si la ruta está protegida, forzar método POST y parsear JSON para obtener username
     if (route.protected){
-        // método correcto
-        if (request.method !== 'POST') {
-            response.writeHead(405, {'Content-Type': 'application/json'});
-            response.end(JSON.stringify( {error: 'Método no válido. Use POST.'}));            
+        if (request.method !== 'POST'){
+            sendError(response,400,'InvalidRequest','Método no válido. Use POST.');
             return;
         }
 
-        const username = request.headers['x-username'];
+        try{
+            // parseBody puede lanzar si no viene JSON válido
+            const body = await parseBody(request);
+            request._body = body; // lo guardamos para que handlers no reconsuman el stream
+        }
+        catch(err){
+            sendError(response,400,'InvalidJSON','El cuerpo debe ser JSON válido.');
+            return;
+        }
 
-        // VALIDACIÓN DE SESIÓN 
-        if (!username) {
-            response.writeHead(401, {'Content-Type': 'application/json'});
-            response.end(JSON.stringify({error: 'Acceso Denegado: Falta username.' }));   
+        const username = (request._body && request._body.username) || request.headers['x-username'];
+
+        if (!username){
+            sendError(response,401,'AccessDenied','Falta username.');
             return;
         }
 
         const currentSession = sesiones.get(username);
-
-        // Verifica existencia de sesión
-        if (!currentSession) {
-            response.writeHead(401, {'Content-Type': 'application/json'});
-            response.end(JSON.stringify(
-            {error: 'Acceso Denegado: Tenés que iniciar sesión.'}));          
+        if (!currentSession){
+            sendError(response,401,'AccessDenied','Tenés que iniciar sesión.');
             return;
         }
 
-        // Verifica estado habilitado
-        if (currentSession.status !== 'enabled') {
-            response.writeHead(401, {'Content-Type': 'application/json'});
-            response.end(JSON.stringify({error: 'La sesión está deshabilitada.' }));         
+        if (currentSession.status !== 'enabled'){
+            sendError(response,401,'AccessDenied','La sesión está deshabilitada.');
             return;
         }
 
-        // AUTORIZADOR: Verifica permisos en la base de datos si corresponde
         const permissionRequired = route.permissionRequired !== false;
-
-        if (permissionRequired) {
+        if (permissionRequired){
             const autorizado = comprobar_permiso_real(username, path);
-
             if (!autorizado){
-                response.writeHead(403, {'Content-Type': 'application/json'});
-                response.end(JSON.stringify({error: `Aviso: El usuario '${username}' no está autorizado para acceder a ${path}.`}));
+                sendError(response,401,'AccessDenied',`El usuario '${username}' no está autorizado para acceder a ${path}.`);
                 return;
             }
         }
-
-        // Todas las validaciones pasaron
-        permitido = true;
     }
-    else {
-        // Ruta pública: se habilita directamente
-        permitido = true;
+    else{
+        // Para rutas públicas aún permitimos POST solo si el handler lo solicita.
+        // No parseamos body aquí; los handlers públicos se encargarán de parsearlo si lo necesitan.
     }
 
-    if (permitido) {
-        return route.handler(request, response); //  route.handler en lugar de handler
+    // Llamar al handler (algunos son async)
+    try{
+        await route.handler(request, response);
+    }
+    catch(err){
+        // Error interno
+        sendError(response,500,'ServerError', err.message || 'Error interno.');
     }
 }
 
