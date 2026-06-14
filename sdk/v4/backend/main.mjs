@@ -79,7 +79,7 @@ async function parseBody(request) {
     });
 }
 
-// Helper para respuestas de error según la especificación solicitada
+// Helper para respuestas de error según la especificaciones
 function sendError(response, code, exception, details){
     response.writeHead(code, { 'Content-Type': 'application/json' });
     response.end(JSON.stringify({ exception: exception, detail: Array.isArray(details) ? details : [details] }));
@@ -183,9 +183,9 @@ async function register_handler(request, response){
         response.writeHead(200, { 'Content-Type': 'application/json' });
         response.end(JSON.stringify(resultado));
     }
-    catch (err) {
+    catch (error) {
         // Error del dominio (usuario ya existe, constraints, etc.) -> 422
-        sendError(response,422,'DomainError', err.message || 'El usuario ya existe o hubo un error.');
+        sendError(response,422,'DomainError', error.message || 'El usuario ya existe o hubo un error.');
     }
 }
 
@@ -212,8 +212,8 @@ async function login_handler(request, response){
             sendError(response,401,'AccessDenied','Credenciales incorrectas.');
         }
     }
-    catch (err) {
-        sendError(response,400,'InvalidRequest', err.message || 'Error en el login.');
+    catch (error) {
+        sendError(response,400,'InvalidRequest', error.message || 'Error en el login.');
     }
 }
 
@@ -237,8 +237,8 @@ async function logout_handler(request, response){
         response.writeHead(200, {'Content-Type': 'application/json'});
         response.end(JSON.stringify({ ok: true, message: 'Sesión deshabilitada.' }));
     }
-    catch(err){
-        sendError(response,400,'InvalidRequest', err.message || 'Error al cerrar sesión.');
+    catch(error){
+        sendError(response,400,'InvalidRequest', error.message || 'Error al cerrar sesión.');
     }
 }
 
@@ -284,7 +284,7 @@ async function request_dispatcher(request, response){
     response.setHeader('Access-Control-Allow-Origin', '*');
     response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     response.setHeader('Access-Control-Allow-Headers','Content-Type, x-username');
-    // Cabecera de versión requerida
+    // Cabecera de versión 
     response.setHeader('X-API-Version','4.2');
 
     if (request.method === 'OPTIONS'){
@@ -311,9 +311,9 @@ async function request_dispatcher(request, response){
         try{
             // parseBody puede lanzar si no viene JSON válido
             const body = await parseBody(request);
-            request._body = body; // lo guardamos para que handlers no reconsuman el stream
+            request._body = body; // lo guardamos 
         }
-        catch(err){
+        catch(error){
             sendError(response,400,'InvalidJSON','El cuerpo debe ser JSON válido.');
             return;
         }
@@ -345,18 +345,15 @@ async function request_dispatcher(request, response){
             }
         }
     }
-    else{
-        // Para rutas públicas aún permitimos POST solo si el handler lo solicita.
-        // No parseamos body aquí; los handlers públicos se encargarán de parsearlo si lo necesitan.
-    }
-
-    // Llamar al handler (algunos son async)
+    //else{}
+        
+        // Llamar al handler 
     try{
         await route.handler(request, response);
     }
-    catch(err){
+    catch(error){
         // Error interno
-        sendError(response,500,'ServerError', err.message || 'Error interno.');
+        sendError(response,500,'ServerError', error.message || 'Error interno.');
     }
 }
 
