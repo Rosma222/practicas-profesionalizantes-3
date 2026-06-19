@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # V.4 : Refactory del codigo dado en clase sdk v.2
 
 ### Es un servidor web que funciona como un **sistema de login y permisos**. Solo permite que usuarios autorizados accedan a ciertas funciones del sistema.
@@ -11,11 +10,28 @@ Desacoplamiento frontend-backend:
 Descoplamiento del autenticador y los mecanismos de sesión:
 - Uso de cabeceras HTTP.
 ```js
-function register_handler(request, response){
-       if (request.method !== 'POST'){
-        response.writeHead(405,{ 'Content-Type': 'application/json'});
-        response.end(JSON.stringify({ error: 'Método no permitido. Use POST.' }));
+async function register_handler(request, response){
+    if (request.method !== 'POST'){
+        sendError(response,400,'InvalidRequest','Método no permitido. Use POST.');
         return;
+    }
+
+    try {
+        const body = request._body || await parseBody(request);
+        if (!body || !body.username || !body.password){
+            sendError(response,400,'InvalidRequest',['Faltan campos username o password']);
+            return;
+        }
+
+        const resultado = createUser(body.username, body.password);
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify(resultado));
+    }
+    catch (err) {
+        // Error del dominio (usuario ya existe, constraints, etc.) -> 422
+        sendError(response,422,'DomainError', err.message || 'El usuario ya existe o hubo un error.');
+    }
+}
 ```
 
 
@@ -60,10 +76,19 @@ Usuario escribe nombre y contraseña
 
 ### **2: Login**
 ```
-Usuario escribe nombre y contraseña
-  → Verificamos que exista en la base de datos
-  → Si es correcto, lo guardamos en memoria como "logueado"
-  → Mostramos mensaje de éxito
+→ Usuario escribe nombre y contraseña
+→ El servidor (main.mjs) genera un token y devuelve:
+{ ok: true, message: 'Login exitoso.', token: '...' }
+→ El frontend (default.html) lo guarda en 'bearerToken'
+>> Valida Authorization: Bearer <token> en las rutas protegidas
+→ El backend Mapea token → usuario para autorizar al usuario correcto
+  >> Verificamos que exista en la base de datos
+  >> Si es correcto, lo guardamos en memoria como "logueado"
+  >> Mostramos mensaje de éxito
+→ usa ese token para:
+  >> verificar sesión activa
+  >> identificar al usuario
+  >> comprobar permisos
 ```
 
 ### **3: Usar Funciones Protegidas**
@@ -78,6 +103,7 @@ Usuario presiona botón (ej: /print)
 ### **4: Logout**
 ```
 Usuario presiona "Cerrar Sesión"
+Elimina el token
   → Se elimina de la memoria
 ```
 
@@ -116,6 +142,7 @@ Usuario -> (pertenece a) -> Grupo -> (tiene acceso a) -> Endpoint
 
 3. **Autorización** (verificar qué puede hacer c/user): Consulta la BD para ver si el grupo tiene permiso
    - Compara: usuario → grupo → permisos → endpoint
+   - Valida Authorization: Bearer <token> en las rutas protegidas
 
 --------------------------------------------------------------------------------------------------------
 
@@ -138,7 +165,7 @@ Usuario -> (pertenece a) -> Grupo -> (tiene acceso a) -> Endpoint
 
 1. username: admin || pass: 1234 || Grupo: total
 2. username: Max   || pass: 1212 || Grupo: oficina
-3. username: Ros   || pass: 2222 || Grupo: saludador
+3. username: Ro    || pass: 2222 || Grupo: saludador
 4. username: UserX || pass: 4567 || Grupo: oficina
 5. username: User2 || pass: 9999 || Grupo: saludador
 
