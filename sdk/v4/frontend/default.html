@@ -148,6 +148,7 @@
 // SESIÓN DEL CLIENTE: Guarda el username actualmente logueado.
    
     let usuarioActual = null; // inicia sin sesion activa, por eso es null
+    let bearerToken = null; // Token recibido al hacer login
 
     // FUNCIÓN AUX P/ MOSTRAR MENSAJES
     function mostrar(texto, esError)
@@ -212,6 +213,7 @@
 
             if (response.ok){
                 usuarioActual = username; // Se guarda el usuario actual en el frontend.
+                bearerToken = data.token || null; //variable q almacena token
 
                 document.getElementById('status')
                     .textContent =
@@ -240,7 +242,10 @@
         try{
             const response = await fetch('http://localhost:3000/Logout',{
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + bearerToken  //bearerToken var q almacena el token al hacer login
+                },
                 body: JSON.stringify ({username: usuarioActual})
             });
 
@@ -248,6 +253,7 @@
 
             if (response.ok){
                 usuarioActual = null; // El frontend olvida el usuario actual, pero en el servidor la sesión NO se borra, se deshabilita.
+                bearerToken = null;
                 document.getElementById('status')
                     .textContent ='No estás logueado.';
 
@@ -269,11 +275,19 @@
             return;
         }
 
+        if (!bearerToken){
+            mostrar('No hay token almacenado. Inicia sesión otra vez.', true);
+            return;
+        }
+
         try {
             const response = await fetch('http://localhost:3000' + endpoint,
             {
                 method: 'POST',
-                headers:{ 'Content-Type': 'application/json' },
+                headers:{
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + bearerToken
+                },
                 body: JSON.stringify({ username: usuarioActual })
             });
 
