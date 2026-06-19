@@ -3,7 +3,7 @@ import { URL } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { resolve } from 'node:path';
-import { createHash } from 'node:crypto'; // P/hashear contraseñas, modulo nativo de node en lugar de `crypto.subtle`
+import { createHash, randomBytes } from 'node:crypto'; // P/hashear contraseñas, modulo nativo de node en lugar de `crypto.subtle`
 
 
 // CONFIGURACIÓN
@@ -48,12 +48,21 @@ function hashSHA256(cadena){
 
 // SESIONES EN MEMORIA || El Map almacena:  username -> objeto UserSession
 const sesiones = new Map();
+const sessionTokens = new Map(); // token -> username
 
 // Clase de sesión: para manejar estados de sesión
 class UserSession {
     constructor() {
         this.status = 'disabled';
+        this.token = null;
     }
+}
+
+//funcion p/ generar un token de sesión único combinando el nombre de usuario, la marca de tiempo actual 
+//y un valor aleatorio, todo hasheado con SHA-256 
+function generateSessionToken(username){
+    const random = randomBytes(16).toString('hex');
+    return hashSHA256(`${username}:${Date.now()}:${random}`);
 }
 
 
@@ -71,7 +80,7 @@ async function parseBody(request) {
                 const parsed = body && body.length ? JSON.parse(body) : {};
                 resolve(parsed);
             }
-            catch(err){
+            catch(error){
                 reject(new Error('Invalid JSON'));
             }
         });
@@ -153,13 +162,24 @@ function login(username, password) {
         sesiones.set(username, currentSession);
     }
 
+    if (currentSession.token){
+        sessionTokens.delete(currentSession.token);
+    }
+
     currentSession.status = 'enabled';
+    currentSession.token = generateSessionToken(username);
+    sessionTokens.set(currentSession.token, username);
+
     return currentSession;
 }
 
 function logout(username){
     const currentSession = sesiones.get(username);
     if (currentSession) {
+        if (currentSession.token){
+            sessionTokens.delete(currentSession.token);
+            currentSession.token = null;
+        }
         currentSession.status = 'disabled';
     }
     return true;
@@ -206,7 +226,7 @@ async function login_handler(request, response){
         const session = login(body.username, body.password);
         if (session){
             response.writeHead(200, {'Content-Type': 'application/json' });
-            response.end(JSON.stringify({ok: true, message: 'Login exitoso.' }));
+            response.end(JSON.stringify({ok: true, message: 'Login exitoso.', token: session.token }));
         }
         else{
             sendError(response,401,'AccessDenied','Credenciales incorrectas.');
@@ -225,8 +245,7 @@ async function logout_handler(request, response){
     }
 
     try{
-        const body = request._body || await parseBody(request);
-        const username = body && body.username;
+        const username = request.username || (request._body && request._body.username);
         if (!username){
             sendError(response,401,'AccessDenied','Falta username.');
             return;
@@ -279,11 +298,11 @@ router.set('/Help',     { handler: help_handler,         protected: true  });
 router.set('/SayHello', { handler: sayHello_handler,     protected: true  });
 router.set('/SayBye',   { handler: sayBye_handler,       protected: true  });
 
-// DESPACHADOR: Middleware del autorizador (ahora async para parsear body cuando sea necesario)
+// DESPACHADOR: Middleware del autorizador 
 async function request_dispatcher(request, response){
     response.setHeader('Access-Control-Allow-Origin', '*');
     response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    response.setHeader('Access-Control-Allow-Headers','Content-Type, x-username');
+    response.setHeader('Access-Control-Allow-Headers','Content-Type, x-username, Authorization');
     // Cabecera de versión 
     response.setHeader('X-API-Version','4.2');
 
@@ -318,10 +337,20 @@ async function request_dispatcher(request, response){
             return;
         }
 
-        const username = (request._body && request._body.username) || request.headers['x-username'];
+// Verificar token Bearer en Authorization
+        const authHeader = request.headers['authorization'];
+        const [scheme, token] = authHeader && typeof authHeader === 'string' //Si authHeader existe y es string, 
+            ? authHeader.trim().split(' ')       //lo divide en esquema y token; si les asigna undefined
+            : [];
+// Si el esquema no es Bearer o falta el token, denegamos el acceso
+        if (!scheme || scheme.toLowerCase() !== 'bearer' || !token){ 
+            sendError(response,401,'AccessDenied','Falta autorización. Usa Authorization: Bearer <token>.');
+            return;
+        }
 
+        const username = sessionTokens.get(token);
         if (!username){
-            sendError(response,401,'AccessDenied','Falta username.');
+            sendError(response,401,'AccessDenied','Token inválido o sesión no iniciada.');
             return;
         }
 
@@ -336,6 +365,8 @@ async function request_dispatcher(request, response){
             return;
         }
 
+        request.username = username;
+
         const permissionRequired = route.permissionRequired !== false;
         if (permissionRequired){
             const autorizado = comprobar_permiso_real(username, path);
@@ -346,8 +377,8 @@ async function request_dispatcher(request, response){
         }
     }
     //else{}
-        
-        // Llamar al handler 
+
+    // Llamar al handler 
     try{
         await route.handler(request, response);
     }
