@@ -287,16 +287,21 @@ function sayBye_handler(request, response){
     response.end(JSON.stringify({ message: 'Acción ejecutada: /sayBye de forma satisfactoria.' }));
 }
 
+// ROUTER
+// public:      true  -> no requiere token ni sesión activa
+//              false -> requiere token válido y sesión habilitada
+// authRequired:true  -> además consulta comprobar_permiso_real() en la BD
+//              false -> solo requiere sesión activa, sin verificar permisos
 const router = new Map();
 
-router.set('/Register', { handler: register_handler,    protected: false });
-router.set('/Login',    { handler: login_handler,        protected: false });
-router.set('/Logout',   { handler: logout_handler,       protected: true, permissionRequired: false });
-router.set('/Print',    { handler: print_handler,        protected: true  });
-router.set('/Log',      { handler: log_handler,          protected: true  });
-router.set('/Help',     { handler: help_handler,         protected: true  });
-router.set('/SayHello', { handler: sayHello_handler,     protected: true  });
-router.set('/SayBye',   { handler: sayBye_handler,       protected: true  });
+router.set('/Register', { handler: register_handler, public: true,  authRequired: false });
+router.set('/Login',    { handler: login_handler,    public: true,  authRequired: false });
+router.set('/Logout',   { handler: logout_handler,   public: false, authRequired: false });
+router.set('/Print',    { handler: print_handler,    public: false, authRequired: true  });
+router.set('/Log',      { handler: log_handler,      public: false, authRequired: true  });
+router.set('/Help',     { handler: help_handler,     public: false, authRequired: true  });
+router.set('/SayHello', { handler: sayHello_handler, public: false, authRequired: true  });
+router.set('/SayBye',   { handler: sayBye_handler,   public: false, authRequired: true  });
 
 // DESPACHADOR: Middleware del autorizador 
 async function request_dispatcher(request, response){
@@ -320,8 +325,8 @@ async function request_dispatcher(request, response){
         return;
     }
 
-    // Si la ruta está protegida, forzar método POST y parsear JSON para obtener username
-    if (route.protected){
+    // Si la ruta no es pública, verificar token y sesión activa
+    if (!route.public){
         if (request.method !== 'POST'){
             sendError(response,400,'InvalidRequest','Método no válido. Use POST.');
             return;
@@ -337,12 +342,12 @@ async function request_dispatcher(request, response){
             return;
         }
 
-// Verificar token Bearer en Authorization
+        // Verificar token Bearer en Authorization
         const authHeader = request.headers['authorization'];
         const [scheme, token] = authHeader && typeof authHeader === 'string' //Si authHeader existe y es string, 
             ? authHeader.trim().split(' ')       //lo divide en esquema y token; si les asigna undefined
             : [];
-// Si el esquema no es Bearer o falta el token, denegamos el acceso
+        // Si el esquema no es Bearer o falta el token, denegamos el acceso
         if (!scheme || scheme.toLowerCase() !== 'bearer' || !token){ 
             sendError(response,401,'AccessDenied','Falta autorización. Usa Authorization: Bearer <token>.');
             return;
@@ -367,8 +372,8 @@ async function request_dispatcher(request, response){
 
         request.username = username;
 
-        const permissionRequired = route.permissionRequired !== false;
-        if (permissionRequired){
+        // Si además requiere permiso, consultar la BD
+        if (route.authRequired){
             const autorizado = comprobar_permiso_real(username, path);
             if (!autorizado){
                 sendError(response,401,'AccessDenied',`El usuario '${username}' no está autorizado para acceder a ${path}.`);
@@ -376,7 +381,6 @@ async function request_dispatcher(request, response){
             }
         }
     }
-    //else{}
 
     // Llamar al handler 
     try{
