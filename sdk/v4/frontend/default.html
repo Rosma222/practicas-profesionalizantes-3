@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Proyecto SDK v4.1 - Sistema de Acceso</title>
+    <title>Proyecto SDK v4.2 - Sistema de Acceso</title>
 
     <style>
 
@@ -165,6 +165,32 @@
     }
 
 
+// FUNCIÓN DE ACCESO A LA WebAPI
+// Encapsula: método POST, cabeceras estándar y token Bearer 
+// Retorna { ok, data } ok es el estado HTTP y data es el JSON parseado.
+
+    async function RPCWebAPIFetch(endpoint, body)
+    {
+        const headers = { 'Content-Type': 'application/json' };
+
+        if (bearerToken){
+            headers['Authorization'] = 'Bearer ' + bearerToken;
+        }
+
+        const response = await fetch('http://localhost:3000' + endpoint, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(body)
+        });
+
+        const data = await response.json();
+
+        return { ok: response.ok, data: data };
+    }
+
+
+
+
 // REGISTRO
 
     async function registrar()
@@ -195,81 +221,91 @@
     }
 
 
+
+// REGISTRO
+
+    async function registrar()
+    {
+        const username = document.getElementById('reg-user').value;
+        const password = document.getElementById('reg-pass').value;
+
+        try{
+            const { ok, data } = await RPCWebAPIFetch('/Register', { username, password });
+
+            if (ok){
+                mostrar(data.message, false);
+            }
+            else{
+                mostrar('Error: ' + (data.detail ? data.detail.join('\n') : JSON.stringify(data)), true);
+            }
+        }
+        catch(error){
+            mostrar('Error conectando con el servidor.', true);
+        }
+    }
+
+
 // LOGIN
 
-    async function hacerLogin(){
+    async function hacerLogin()
+    {
         const username = document.getElementById('log-user').value;
         const password = document.getElementById('log-pass').value;
 
         try{
-            const response = await fetch('http://localhost:3000/Login',
-            {
-                method: 'POST',
-                headers:{'Content-Type': 'application/json'},
-                body: JSON.stringify ({username: username,password: password})
-            });
+            const { ok, data } = await RPCWebAPIFetch('/Login', { username, password });
 
-            const data = await response.json();
+            if (ok){
+                usuarioActual = username;
+                bearerToken   = data.token || null;
 
-            if (response.ok){
-                usuarioActual = username; // Se guarda el usuario actual en el frontend.
-                bearerToken = data.token || null; //variable q almacena token
-
-                document.getElementById('status')
-                    .textContent =
-                    'Logueado como: ' + username;
-
-                mostrar ('Sesión habilitada correctamente.', false);
+                document.getElementById('status').textContent = 'Logueado como: ' + username;
+                mostrar('Sesión habilitada correctamente.', false);
             }
             else{
-                mostrar ( 'Falla de autenticación: ' + data.error, true );
+                mostrar('Falla de autenticación: ' + (data.detail ? data.detail.join('\n') : JSON.stringify(data)), true);
             }
         }
         catch(error){
-              mostrar ('Error conectando con el servidor.',true);
+            mostrar('Error conectando con el servidor.', true);
         }
     }
 
+
 // LOGOUT
 
-    async function hacerLogout()    {
-        if (!usuarioActual)
-        {
+    async function hacerLogout()
+    {
+        if (!usuarioActual){
             mostrar('No hay sesión activa.', true);
             return;
         }
 
         try{
-            const response = await fetch('http://localhost:3000/Logout',{
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + bearerToken  //bearerToken var q almacena el token al hacer login
-                },
-                body: JSON.stringify ({username: usuarioActual})
-            });
+            const { ok, data } = await RPCWebAPIFetch('/Logout', { username: usuarioActual });
 
-            const data = await response.json();
+            if (ok){
+                usuarioActual = null;
+                bearerToken   = null;
 
-            if (response.ok){
-                usuarioActual = null; // El frontend olvida el usuario actual, pero en el servidor la sesión NO se borra, se deshabilita.
-                bearerToken = null;
-                document.getElementById('status')
-                    .textContent ='No estás logueado.';
-
-                mostrar ('Sesión deshabilitada.', false);
+                document.getElementById('status').textContent = 'No estás logueado.';
+                mostrar('Sesión deshabilitada.', false);
             }
             else{
-                mostrar(data.error, true);
+                mostrar(data.detail ? data.detail.join('\n') : JSON.stringify(data), true);
             }
         }
         catch(error){
-            mostrar('Error conectando con el servidor.', true );
+            mostrar('Error conectando con el servidor.', true);
         }
     }
 
+
+    
 // LLAMADAS A ENDPOINTS PROTEGIDOS
-    async function llamar(endpoint) {
+
+    async function llamar(endpoint)
+    {
         if (!usuarioActual){
             mostrar('Aviso: Primero tenés que loguearte.', true);
             return;
@@ -280,31 +316,21 @@
             return;
         }
 
-        try {
-            const response = await fetch('http://localhost:3000' + endpoint,
-            {
-                method: 'POST',
-                headers:{
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + bearerToken
-                },
-                body: JSON.stringify({ username: usuarioActual })
-            });
+        try{
+            const { ok, data } = await RPCWebAPIFetch(endpoint, { username: usuarioActual });
 
-            const data = await response.json();
-
-            if (response.ok){
-                mostrar(data.message, false );
+            if (ok){
+                mostrar(data.message, false);
             }
             else{
-                // ahora el servidor devuelve { exception, detail }
-                mostrar('Cartel de Aviso del Servidor:\n' + (data.detail ? data.detail.join('\n') : JSON.stringify(data)), true );
+                mostrar('Cartel de Aviso del Servidor:\n' + (data.detail ? data.detail.join('\n') : JSON.stringify(data)), true);
             }
         }
         catch(error){
-            mostrar('Error conectando con el servidor.', true );
+            mostrar('Error conectando con el servidor.', true);
         }
     }
+
 
 </script>
 
