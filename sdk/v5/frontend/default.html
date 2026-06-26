@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Proyecto SDK v5 - Sistema de Acceso</title>
+
+    <style>
+
+        body
+        {
+            font-family: monospace;
+            max-width: 480px;
+            margin: 40px auto;
+            padding: 0 16px;
+        }
+
+        h2
+        {
+            margin-top: 28px;
+            font-size: 1em;
+            text-transform: uppercase;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 4px;
+        }
+
+        input
+        {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 6px;
+            padding: 6px;
+        }
+
+        button
+        {
+            margin: 4px 4px 4px 0;
+            padding: 6px 14px;
+            cursor: pointer;
+        }
+
+        #status
+        {
+            margin-top: 8px;
+            font-size: 0.85em;
+            color: #555;
+        }
+
+        #resultado
+        {
+            margin-top: 14px;
+            padding: 8px;
+            background: #f5f5f5;
+            border-left: 3px solid #999;
+            font-size: 0.9em;
+            min-height: 24px;
+            white-space: pre-wrap;
+        }
+
+    </style>
+</head>
+
+<body>
+
+
+<!-- REGISTRO -->
+    <h2>Registro de usuario</h2>
+
+    <input
+        id="reg-user"
+        placeholder="Usuario"
+    >
+
+    <input
+        id="reg-pass"
+        placeholder="Contraseña"
+        type="password"
+    >
+
+    <button onclick="registrar()">
+        Crear usuario
+    </button>
+
+
+<!-- LOGIN -->
+    <h2>Login</h2>
+
+    <input
+        id="log-user"
+        placeholder="Usuario"
+    >
+
+    <input
+        id="log-pass"
+        placeholder="Contraseña"
+        type="password"
+    >
+
+    <button onclick="hacerLogin()">
+        Iniciar Sesión
+    </button>
+
+    <button onclick="hacerLogout()">
+        Cerrar Sesión
+    </button>
+
+    <div id="status">
+        No estás logueado.
+    </div>
+
+
+<!-- ACCIONES PROTEGIDAS -->
+   
+    <h2>Ejecutar Acciones</h2>
+
+    <button onclick="llamar('/Print')">
+        /Print
+    </button>
+
+    <button onclick="llamar('/Log')">
+        /Log
+    </button>
+
+    <button onclick="llamar('/Help')">
+        /Help
+    </button>
+
+    <button onclick="llamar('/SayHello')">
+        /SayHello
+    </button>
+
+    <button onclick="llamar('/SayBye')">
+        /SayBye
+    </button>
+
+  
+<!-- RESULTADO -->
+   
+    <h2>Resultado de la Operación</h2>
+
+    <div id="resultado">
+        Esperando acción del usuario...
+    </div>
+
+<script>
+
+
+// CLASES DE EXCEPCIÓN - Mapean los códigos HTTP de la WebAPI 
+// Heredan de Error - es una clase nativa de JS
+
+    class SpecificationError  extends Error {} // 400 - Request mal formado
+    class UnauthorizedError   extends Error {} // 401 - Sin sesión o sin permiso
+    class DomainError         extends Error {} // 422 - Violación de regla de negocio
+    class ProgramError        extends Error {} // 500 - Error interno del servidor
+
+
+// SESIÓN DEL CLIENTE
+    let usuarioActual = null; // inicia sin sesion activa
+    let bearerToken   = null; // token recibido al hacer login
+
+
+// FUNCIÓN AUX P/ MOSTRAR MENSAJES
+    function mostrar(texto, esError)
+    {
+        const contenedor = document.getElementById('resultado');
+        contenedor.textContent = texto;
+
+        if (esError){
+            contenedor.style.borderLeftColor = 'red';
+        }
+        else{
+            contenedor.style.borderLeftColor = 'green';
+        }
+    }
+
+
+// FUNCIÓN DE ACCESO A LA WebAPI
+
+    async function RPCWebAPIFetch(endpoint, body)
+    {
+        try
+        {
+            const headers = { 'Content-Type': 'application/json' };
+
+            if (bearerToken){
+                headers['Authorization'] = 'Bearer ' + bearerToken;
+            }
+
+            const res = await fetch('http://localhost:3000' + endpoint, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(body)
+            });
+
+            const data = await res.json();
+
+            switch (res.status)
+            {
+                case 200: return data;
+
+                case 400: throw new SpecificationError (data.detail ? data.detail.join('\n') : 'Error de especificación.');
+                case 401: throw new UnauthorizedError  (data.detail ? data.detail.join('\n') : 'No autorizado.');
+                case 422: throw new DomainError        (data.detail ? data.detail.join('\n') : 'Error de dominio.');
+                case 500: throw new ProgramError       (data.detail ? data.detail.join('\n') : 'Error interno del servidor.');
+
+                default:  throw new SpecificationError (data.detail ? data.detail.join('\n') : 'Respuesta inesperada del servidor.');
+            }
+        }
+        catch (err)
+        {
+            // Si ya es una de las excepciones tipadas, la propagamos tal cual
+            if (   err instanceof SpecificationError  // instanceof es un operador de JavaScript que permite comprobar  
+                || err instanceof UnauthorizedError  //si un objeto es una instancia de una clase específica
+                || err instanceof DomainError       
+                || err instanceof ProgramError)  // el simbolo || significa "o"
+            {
+                throw err;
+            }
+
+            // Cualquier otro error --> error genérico
+            throw new Error('Ha ocurrido un error inesperado.');
+        }
+    }
+
+
+// REGISTRO
+
+    async function registrar()
+    {
+        const username = document.getElementById('reg-user').value;
+        const password = document.getElementById('reg-pass').value;
+
+        try{
+            const data = await RPCWebAPIFetch('/Register', { username, password });
+            mostrar(data.message, false);
+        }
+        catch (error){
+            if (error instanceof DomainError){
+                mostrar('Usuario ya existe: ' + error.message, true);
+            }
+            else if (error instanceof SpecificationError){
+                mostrar('Error de solicitud: ' + error.message, true);
+            }
+            else{
+                mostrar(error.message, true);
+            }
+        }
+    }
+
+
+// LOGIN
+
+    async function hacerLogin()
+    {
+        const username = document.getElementById('log-user').value;
+        const password = document.getElementById('log-pass').value;
+
+        try{
+            const data = await RPCWebAPIFetch('/Login', { username, password });
+
+            usuarioActual = username;
+            bearerToken   = data.token || null;
+
+            document.getElementById('status').textContent = 'Logueado como: ' + username;
+            mostrar('Sesión habilitada correctamente.', false);
+        }
+        catch (error){
+            if (error instanceof UnauthorizedError){
+                mostrar('Credenciales incorrectas: ' + error.message, true);
+            }
+            else if (error instanceof SpecificationError){
+                mostrar('Error de solicitud: ' + error.message, true);
+            }
+            else{
+                mostrar(error.message, true);
+            }
+        }
+    }
+
+
+// LOGOUT
+
+    async function hacerLogout()
+    {
+        if (!usuarioActual){
+            mostrar('No hay sesión activa.', true);
+            return;
+        }
+
+        try{
+            const data = await RPCWebAPIFetch('/Logout', { username: usuarioActual });
+
+            usuarioActual = null;
+            bearerToken   = null;
+
+            document.getElementById('status').textContent = 'No estás logueado.';
+            mostrar('Sesión deshabilitada.', false);
+        }
+        catch (error){
+            if (error instanceof UnauthorizedError){
+                mostrar('No autorizado: ' + error.message, true);
+            }
+            else{
+                mostrar(error.message, true);
+            }
+        }
+    }
+
+
+// LLAMADAS A ENDPOINTS PROTEGIDOS
+
+    async function llamar(endpoint)
+    {
+        if (!usuarioActual){
+            mostrar('Aviso: Primero tenés que loguearte.', true);
+            return;
+        }
+
+        if (!bearerToken){
+            mostrar('No hay token almacenado. Inicia sesión otra vez.', true);
+            return;
+        }
+
+        try{
+            const data = await RPCWebAPIFetch(endpoint, { username: usuarioActual });
+            mostrar(data.message, false);
+        }
+        catch (error){
+            if (error instanceof UnauthorizedError){
+                mostrar('Acceso denegado: ' + error.message, true);
+            }
+            else if (error instanceof DomainError){
+                mostrar('Error de dominio: ' + error.message, true);
+            }
+            else if (error instanceof SpecificationError){
+                mostrar('Error de solicitud: ' + error.message, true);
+            }
+            else if (error instanceof ProgramError){
+                mostrar('Error interno del servidor: ' + error.message, true);
+            }
+            else{
+                mostrar(error.message, true);
+            }
+        }
+    }
+
+</script>
+
+</body>
+</html>
